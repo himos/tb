@@ -1,4 +1,4 @@
-name := "taboola"
+name := "tb"
 
 version := "0.1"
 
