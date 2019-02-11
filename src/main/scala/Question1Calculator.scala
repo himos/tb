@@ -1,9 +1,21 @@
-object Question1Calculator extends App {
-  // question: what is expected behavior of ++i/i++ when no i is defined
-  // question: can braces be used?
-  // question: full list of operators?
-  // question: division operation is integer or I assume all numbers going to be double?
+import java.io._
 
-  1 * 2
+import scala.io.Source
+
+object Question1Calculator extends App {
+
+    if(args.length < 1) throw new IllegalArgumentException("Expecting file path as program argument")
+
+    var file = new File(args(0))
+
+    val source =  Source.fromFile(file)
+
+    val state = CalcState()
+
+    source.getLines().foreach(l => {
+        if(l.nonEmpty) Expression(new Tokenizer(new CharStreamProcessorImpl(l)), state).result
+    })
+
+    println(state.vars.map(kv => kv._1 + "=" + kv._2).mkString("(", ",", ")"))
 
 }

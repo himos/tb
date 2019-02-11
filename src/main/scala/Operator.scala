@@ -18,7 +18,7 @@ object UnaryOperatorType extends Enumeration {
 object Operator {
   def getUni(op: String, opType: UnaryOperatorType.Value): UnaryOperator = {
     op match {
-      case "++" => UnaryOperator(x => x + 1, opType, 111)
+      case "++" => UnaryOperator(x => x + 1, opType, 110)
       case "--" => UnaryOperator(x => x - 1, opType, 110)
       case "+" => UnaryOperator(x => x, opType, 100)
       case "-" => UnaryOperator(x => -x, opType, 100)
@@ -32,11 +32,12 @@ object Operator {
       case "-" => BinaryOperator((x, y) => x - y, 80)
       case "*" => BinaryOperator((x, y) => x * y, 90)
       case "/" => BinaryOperator((x, y) => x / y, 90)
+      case x => throw new IllegalArgumentException(s"Expecting binary operator, but got $x")
     }
   }
 }
 
-case object AssignmentOperator extends Operator {
+case class AssignmentOperator(op: Option[(Double, Double) => Double]) extends Operator {
   override val precedence: Int = 10
 }
 

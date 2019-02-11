@@ -9,7 +9,7 @@
         <Root level="info">
             <AppenderRef ref="Console"/>
         </Root>
-        <Logger name="Expression$" level="trace" />
-        <Logger name="Tokenizer" level="trace" />
+        <Logger name="Expression$" level="info" />
+        <Logger name="Tokenizer" level="info" />
     </Loggers>
 </Configuration>

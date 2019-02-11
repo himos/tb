@@ -1,15 +1,15 @@
+import java.util
+
 import org.apache.logging.log4j.scala.Logging
 
 import scala.collection.mutable.{Map => MMap, Stack => MStack}
 
 
 
-case class State(vars: MMap[String, Double] = MMap.empty,
-                 exprStack: MStack[Expression] = MStack(),
-                 operatorStack: MStack[Operator] = MStack()) extends Logging{
-  override def toString: String = {
-    exprStack.toString() + "\n" + operatorStack.toString()
-  }
+case class CalcState(vars: MMap[String, Double] = MMap.empty,
+                     exprStack: util.Deque[Expression] = new util.ArrayDeque[Expression](),
+                     operatorStack: util.Deque[Operator] =  new util.ArrayDeque[Operator]()) extends Logging{
+
 
   def pushExpression(expression: Expression): Unit = {
     logger.debug(s"Pushing expression ${expression.getClass}")
@@ -17,9 +17,9 @@ case class State(vars: MMap[String, Double] = MMap.empty,
   }
 
   def pushOp(op: Operator): Unit = {
-    while (operatorStack.nonEmpty &&
-      operatorStack.head != OpenBracket &&
-      operatorStack.head.precedence > op.precedence) {
+    while (operatorStack.size() > 0 &&
+      operatorStack.getFirst != OpenBracket &&
+      operatorStack.getFirst.precedence > op.precedence) {
       popOp()
     }
     logger.debug(s"Pushing operator: $op")
@@ -49,6 +49,16 @@ case class State(vars: MMap[String, Double] = MMap.empty,
         throw new IllegalArgumentException("Unbalanced brackets.")
     }
   }
+
+  def result: Expression = {
+    while (operatorStack.size() > 0){
+      popOp()
+    }
+    assert(exprStack.size == 1)
+    exprStack.pop()
+  }
+
+  override def toString: String = exprStack.toString + "\n" + operatorStack.toString
 
 }
 

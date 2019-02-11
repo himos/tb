@@ -1,6 +1,7 @@
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 
 public class Question2 {
     private Long m_time;
@@ -20,18 +21,26 @@ public class Question2 {
     }
 
 //        It's hard to say why equals is implemented this way and for what purposes, as a rule of thumb its better to implement
-//        both equals and hashCode together, also I would use equality on Class object instead of instanceOf since obj can be subclass of Myc
-//
+//        both equals and hashCode together, also I would use equality on Class object instead of instanceOf since obj can be subclass of MyClass,
+//        also better to use @Override fot less space of typos and errors
+//    public boolean equals(Object obj) {
+//        if (obj instanceof Question2) {
+//            return m_name.equals(((Question2)obj).m_name);
+//        }
+//        return false;
+//    }
 
+    @Override
     public boolean equals(Object obj) {
-        if(obj == this) return true;
-        if(obj != null && obj.getClass() == getClass()) {
-            return m_name.equals(((Question2)obj).m_name);
-        }
-        return false;
+        if (this == obj) return true;
+        if (obj == null || getClass() != obj.getClass()) return false;
+        return Objects.equals(m_name, ((Question2) obj).m_name);
     }
 
-    
+    @Override
+    public int hashCode() {
+        return Objects.hash(m_name);
+    }
 
     public String toString() {
 //        String out = m_name;

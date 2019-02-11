@@ -1,7 +1,7 @@
 import org.scalatest.{FlatSpec, Matchers}
 
-class CharStreamTest extends FlatSpec with Matchers {
-  behavior of "CharStream"
+class CharStreamProcessorTest extends FlatSpec with Matchers {
+  behavior of "CharStreamProcessor"
 
   it should "create charstream from string" in {
     val stream = new CharStreamProcessorImpl("12345")

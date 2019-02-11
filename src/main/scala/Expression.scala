@@ -1,4 +1,5 @@
 import org.apache.logging.log4j.scala.Logging
+import scala.collection.JavaConverters._
 
 sealed trait Expression {
   def result: Double
@@ -13,15 +14,14 @@ case class UnaryExpression(operator: Double => Double, expr: Expression) extends
   override def result: Double = operator(expr.result)
 }
 
-case class PrefixExpression(operator: Double => Double, varExpression: VarExpression, state: State) extends Expression {
+case class PrefixExpression(operator: Double => Double, varExpression: VarExpression, state: CalcState) extends Expression {
   override def result: Double = {
     state.vars(varExpression.varname) = operator(varExpression.result)
-    println(state.vars(varExpression.varname))
     varExpression.result
   }
 }
 
-case class PostfixExpression(operator: Double => Double, varExpression: VarExpression, state: State) extends Expression {
+case class PostfixExpression(operator: Double => Double, varExpression: VarExpression, state: CalcState) extends Expression {
   override def result: Double = {
     val result = varExpression.result
     state.vars(varExpression.varname) = operator(varExpression.result)
@@ -29,13 +29,16 @@ case class PostfixExpression(operator: Double => Double, varExpression: VarExpre
   }
 }
 
-case class VarExpression(varname: String, state: State) extends Expression {
+case class VarExpression(varname: String, state: CalcState) extends Expression {
   override def result: Double = state.vars(varname)
 }
 
-case class AssignmentExpression(expr: Expression, varname: String, state: State) extends Expression {
+case class AssignmentExpression(expr: Expression,
+                                operator: Option[(Double, Double) => Double],
+                                varname: String,
+                                state: CalcState) extends Expression {
   override def result: Double = {
-    state.vars(varname) = expr.result
+    state.vars(varname) = operator.fold(expr.result)(f => f(state.vars(varname), expr.result))
     state.vars(varname)
   }
 }
@@ -43,45 +46,64 @@ case class AssignmentExpression(expr: Expression, varname: String, state: State)
 case class SimpleExpression(result: Double) extends Expression
 
 object Expression extends Logging {
-  def apply(tokenizer: Tokenizer, state: State): Expression = {
-    logger.info(s"Received new token stream: $tokenizer")
-    val token = tokenizer.next()
-    token match {
-      case EndToken => null
-      case otherToken => expectExpr(token, tokenizer, state)
+  def apply(tokenizer: Tokenizer, state: CalcState): Expression = {
+    logger.debug(s"Received new token stream: $tokenizer")
+    if(tokenizer.hasNext){
+      expectExpr(tokenizer.next(), tokenizer, state)
+    } else {
+      null
     }
   }
 
 
-  private[this] def expectAfterExpr(token: Token, tokenizer: Tokenizer, state: State): Expression = {
+  private[this] def expectAfterExpr(token: Token, tokenizer: Tokenizer, state: CalcState): Expression = {
     token match {
       case EndToken => state.result
       case OperatorToken(op) =>
         op match {
+          case assignment if assignment.contains("=") =>
+            val biOpSplit = assignment.split("=")
+            val biOp =
+              if(biOpSplit.nonEmpty)
+                Some(Operator.getBi(biOpSplit(0)).op)
+              else
+                None
+
+            if(state.operatorStack.asScala.forall(op => op == OpenBracket || op.isInstanceOf[AssignmentOperator]) &&
+            state.exprStack.getFirst.isInstanceOf[VarExpression]){
+              state.pushOp(AssignmentOperator(biOp))
+              expectExpr(tokenizer.next(), tokenizer, state)
+            } else {
+              throw new IllegalArgumentException("Illegal place for assignment: " + tokenizer.toString())
+            }
+
           case "++" | "--" =>
-            pushOp(Operator.getUni(op, UnaryOperatorType.Postfix), state)
-            expectAfterExpr(tokenizer.next(), tokenizer, state)
-          case otherOp =>
-            pushOp(Operator.getBi(op), state)
+            state.exprStack.getFirst match {
+              case VarExpression(varname, _) =>
+                state.pushOp(Operator.getUni(op, UnaryOperatorType.Postfix))
+                expectAfterExpr(tokenizer.next(), tokenizer, state)
+              case _ => throw new IllegalArgumentException("Variable expected: " + tokenizer.toString())
+            }
+
+          case _ =>
+            state.pushOp(Operator.getBi(op))
             expectExpr(tokenizer.next(), tokenizer, state)
         }
-      case AssignmentToken =>
-        if(state.operatorStack.forall(op => op == OpenBracket || op == AssignmentOperator)){
-          state.operatorStack.push(AssignmentOperator)
-          expectExpr(tokenizer.next(), tokenizer, state)
-        } else {
-          throw new IllegalArgumentException("Illegal place for assignment.")
-        }
+
       case CloseBracketToken =>
-        while (state.operatorStack.head != OpenBracket) popOp(state)
-        state.operatorStack.pop()
-        expectAfterExpr(tokenizer.next(), tokenizer, state)
+        try {
+          while (state.operatorStack.getFirst != OpenBracket) state.popOp()
+          state.operatorStack.pop()
+          expectAfterExpr(tokenizer.next(), tokenizer, state)
+        } catch {
+          case e: NoSuchElementException => throw new IllegalArgumentException("Unbalanced close bracket: " + tokenizer.toString())
+        }
 
     }
 
   }
 
-  private[this] def expectVar(token: Token, tokenizer: Tokenizer, state: State): Expression = {
+  private[this] def expectVar(token: Token, tokenizer: Tokenizer, state: CalcState): Expression = {
     token match {
       case VariableToken(varname) =>
         processVariable(tokenizer, state, varname)
@@ -89,12 +111,12 @@ object Expression extends Logging {
     }
   }
 
-  private def processVariable(tokenizer: Tokenizer, state: State, varname: String) = {
-    pushExpression(state, VarExpression(varname, state))
+  private def processVariable(tokenizer: Tokenizer, state: CalcState, varname: String) = {
+    state.pushExpression(VarExpression(varname, state))
     expectAfterExpr(tokenizer.next(), tokenizer, state)
   }
 
-  private[this] def expectExpr(token: Token, tokenizer: Tokenizer, state: State): Expression = {
+  private[this] def expectExpr(token: Token, tokenizer: Tokenizer, state: CalcState): Expression = {
       token match {
       case OpenBracketToken =>
         state.operatorStack.push(OpenBracket)
@@ -102,11 +124,11 @@ object Expression extends Logging {
       case OperatorToken(op) =>
         op match {
           case "++" | "--"  =>
-            pushOp(Operator.getUni(op, UnaryOperatorType.Prefix), state)
+            state.pushOp(Operator.getUni(op, UnaryOperatorType.Prefix))
             expectVar(tokenizer.next(), tokenizer, state)
 
           case otherOp =>
-            pushOp(Operator.getUni(op, UnaryOperatorType.None), state)
+            state.pushOp(Operator.getUni(op, UnaryOperatorType.None))
             expectExpr(tokenizer.next(), tokenizer, state)
 
         }
@@ -117,49 +139,13 @@ object Expression extends Logging {
 
       case NumberToken(double) =>
         val expression = SimpleExpression(double)
-        pushExpression(state, expression)
+        state.pushExpression(expression)
         expectAfterExpr(tokenizer.next(), tokenizer, state)
-      case x => throw new IllegalArgumentException(s"Unexpected start of expression: $x")
+      case x => throw new IllegalArgumentException(s"Unexpected start of expression: $x in " + tokenizer.toString())
 
 
     }
   }
 
-  private def pushExpression(state: State, expression: Expression) = {
-    logger.info(s"Pushing expression ${expression.getClass}")
-    state.exprStack.push(expression)
-  }
-
-  private[this] def pushOp(op: Operator, state: State): Unit = {
-    val opStack = state.operatorStack
-    while (opStack.nonEmpty && opStack.head != OpenBracket && opStack.head.precedence > op.precedence) {
-      popOp(state)
-    }
-    logger.info(s"Pushing operator: $op")
-    opStack.push(op)
-  }
-
-
-  private[this] def popOp(state: State): Unit = {
-    val exprStack = state.exprStack
-    state.operatorStack.pop() match {
-      case AssignmentOperator =>
-        val operand = exprStack.pop()
-        val varExpression = exprStack.pop().asInstanceOf[VarExpression]
-        pushExpression(state, AssignmentExpression(operand, varExpression.varname, varExpression.state))
-      case UnaryOperator(op, opType, _) =>
-        val operand = exprStack.pop()
-        val expr = opType match {
-          case UnaryOperatorType.Prefix => PrefixExpression(op, operand.asInstanceOf[VarExpression], state)
-          case UnaryOperatorType.Postfix => PostfixExpression(op, operand.asInstanceOf[VarExpression], state)
-          case UnaryOperatorType.None => UnaryExpression(op, operand)
-        }
-        pushExpression(state, expr)
-      case BinaryOperator(op, _) =>
-        val right = exprStack.pop()
-        val left = exprStack.pop()
-        pushExpression(state, BinaryExpression(op, left, right))
-    }
-  }
 
 }
