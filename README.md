@@ -2,6 +2,9 @@
 `sbt "run <absolute_path_to_file>"` will run the program. 
 Where `<absolute_path_to_file>` is file with all the expressions to run.
 
+## Question 2
+[Fixes and comments](src/main/scala/Question2.java)
+
 ## Question 3
 #### Problems with current solution.
 
@@ -79,7 +82,7 @@ since we don't support write operation we don't know when to update entries
 * Warmups upon start: can keep logs of cache access and 
 in case of restart replay them a couple of times  
 
-#### Question 5
+## Question 5
 
 Both issues can be fixed by using a distributed cache like `memcached`, 
 frontend servers can use `memcached` instances instead of local cache 
