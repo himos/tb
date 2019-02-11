@@ -18,4 +18,6 @@ object Question1Calculator extends App {
 
     println(state.vars.map(kv => kv._1 + "=" + kv._2).mkString("(", ",", ")"))
 
+//    System.exit(0)
+
 }
