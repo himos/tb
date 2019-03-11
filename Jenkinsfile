@@ -1,4 +1,3 @@
-
 pipeline {
     agent any
 
@@ -6,21 +5,25 @@ pipeline {
         skipStagesAfterUnstable()
     }
 
-    stage('Build') {
-        steps {
-            sh 'mvn compile'
-        }
-    }
+    stages {
 
-    stage('Test') {
-        steps {
-            sh 'mvn test'
-        }
-    }
 
-    stage('Deploy') {
-        steps {
-            sh 'mvn package'
+        stage('Build') {
+            steps {
+                sh 'mvn compile'
+            }
+        }
+
+        stage('Test') {
+            steps {
+                sh 'mvn test'
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                sh 'mvn package'
+            }
         }
     }
 
