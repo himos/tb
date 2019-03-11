@@ -5,6 +5,11 @@ pipeline {
         skipStagesAfterUnstable()
     }
 
+    tools {
+        maven 'maven'
+    }
+
+
     stages {
 
 
